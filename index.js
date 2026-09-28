@@ -5,7 +5,7 @@ const four01games = require("./integrations/401games");
 const csvFilePath = process.argv[2];
 
 const validateRow = (row, index) => {
-  const requiredKeys = ["card_name", "tag_face", "tag_401games"];
+  const requiredKeys = ["card_name", "set_name", "set_code"];
 
   for (const key of requiredKeys) {
     if (!(key in row)) {
@@ -19,14 +19,29 @@ const validateRow = (row, index) => {
     );
   }
 
-  return {
-    card_name: row.card_name,
-    tags: {
-        face: row.tag_face == "" ? null : row.tag_face,
-        "401games": row["tag_401games"] == "" ? null : row["tag_401games"]
-    }
-  };
+  if (row.set_name.trim() === "") {
+    throw new Error(
+      `Row ${index + 1} field "set_name" must be a non-empty string, got ${JSON.stringify(row.set_name)}`
+    );
+  }
+
+  if (row.set_code.trim() === "") {
+    throw new Error(
+      `Row ${index + 1} field "set_code" must be a non-empty string, got ${JSON.stringify(row.set_code)}`
+    );
+  }
+
+  return row;
 };
+
+function stringifyCsv(rows) {
+  const headers = Object.keys(rows[0]);
+
+  return [
+    headers.join(",").replace("four01games_price", "401games_price"),
+    ...rows.map((row) => headers.map((header) => row[header]).join(",")),
+  ].join("\n");
+}
 
 if (!csvFilePath) {
   console.error("Usage: node index.js <csv-file-path>");
@@ -37,27 +52,28 @@ csvtojson()
   .fromFile(csvFilePath)
   .then((rows) => {
     const validatedRows = rows.map(validateRow);
-    console.log(JSON.stringify(validatedRows, null, 2));
+    console.error(JSON.stringify(validatedRows, null, 2));
 
-    console.log("Fetching prices from Face to Face Games...");
-    validatedRows.forEach(async (row) => {
+    console.error("Fetching prices...");
+    return Promise.all(validatedRows.map(async (row) => {
       try {
-        const price = await face.fetch(row.tags.face);
-        console.log(`Price for ${row.card_name} from Face to Face Games: $${price}`);
+        row.face_price = await face.fetch(row);
       } catch (error) {
         console.error(`Error fetching price for ${row.card_name} from Face to Face Games:`, error.message);
       }
-    });
 
-    console.log("Fetching prices from 401 Games...");
-    validatedRows.forEach(async (row) => {
       try {
-        const price = await four01games.fetch(row.tags["401games"]);
-        console.log(`Price for ${row.card_name} from 401 Games: $${price}`);
+        row.four01games_price = await four01games.fetch(row);
       } catch (error) {
         console.error(`Error fetching price for ${row.card_name} from 401 Games:`, error.message);
       }
-    });
+
+      return row;
+    }))
+    .then((updatedRows) => {
+      console.error("Updated rows with prices:");
+      console.log(stringifyCsv(updatedRows));
+    })
   })
   .catch((error) => {
     console.error("Error reading CSV file:", error.message);

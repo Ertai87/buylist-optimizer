@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run index.js",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "/Users/ertai87/.nvm/versions/node/v21.7.1/bin/node",
+      "program": "${workspaceFolder}/index.js",
+      "args": [
+        "${workspaceFolder}/buylist.csv",
+        ">",
+        "${workspaceFolder}/buylist_with_prices.csv"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm install",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+}
